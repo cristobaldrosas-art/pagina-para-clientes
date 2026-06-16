@@ -302,8 +302,13 @@
               <button class="btn-secondary" style="font-size: 0.8rem; padding: 6px 12px; width: 100%;" onclick="exportDatabase()">Exportar Stock (JSON)</button>
               
               <label class="btn-secondary" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; text-align: center; cursor: pointer; display: block;">
-                Importar Stock
+                Importar Stock (JSON)
                 <input type="file" id="admin-import-file" style="display: none;" accept=".json" onchange="importDatabase(event)">
+              </label>
+              
+              <label class="btn-secondary" style="font-size: 0.8rem; padding: 6px 12px; width: 100%; text-align: center; cursor: pointer; display: block; border-color: var(--accent); color: var(--accent); background: rgba(245, 190, 24, 0.05);">
+                Importar desde PDF
+                <input type="file" id="admin-import-pdf" style="display: none;" accept=".pdf" onchange="importFromPDF(event)">
               </label>
             </div>
           </aside>
@@ -454,8 +459,48 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL: PREVIEW IMPORTACIÓN PDF ==================== -->
+  <div id="pdf-preview-modal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 750px;">
+      <div class="modal-header">
+        <h3>Vehículos Detectados en el PDF</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 15px;">
+          Hemos analizado el PDF y encontramos los siguientes vehículos. Desmarca los que no deseas importar o los que parezcan incorrectos.
+        </p>
+        <div class="admin-stock-table-wrapper" style="max-height: 350px; overflow-y: auto;">
+          <table class="admin-table" id="pdf-preview-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;"><input type="checkbox" id="pdf-select-all" checked onchange="toggleSelectAllPDF(this)"></th>
+                <th>Vehículo</th>
+                <th>Año</th>
+                <th>Precio</th>
+                <th>Kilometraje</th>
+                <th>Especificaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Rellenado dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
+          <button class="btn-secondary" onclick="closeModal('pdf-preview-modal')">Cancelar</button>
+          <button id="pdf-confirm-btn" class="btn-primary" onclick="confirmPDFImport()">Importar Seleccionados</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Cargar los scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  </script>
   <script src="js/config.js"></script>
   <script src="js/vehicles.js"></script>
   <script src="js/app.js"></script>
