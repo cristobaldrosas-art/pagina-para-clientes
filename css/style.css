@@ -879,8 +879,43 @@ footer {
   }
   
   .vehicles-grid {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .vehicle-specs {
+    display: none;
+  }
+  
+  .card-content {
+    padding: 10px;
+  }
+  
+  .card-header-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+  
+  .vehicle-title {
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+  }
+  
+  .vehicle-year {
+    font-size: 0.7rem;
+    padding: 1px 4px;
+  }
+  
+  .vehicle-price {
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+  
+  .btn-card {
+    padding: 8px 4px;
+    font-size: 0.8rem;
   }
   
   .modal-overlay {
