@@ -13,6 +13,7 @@ let selectedVehicleForEvaluation = null;
 let selectedVehicleForDetails = null;
 let logCurrentPage = 1;
 const LOG_PAGE_SIZE = 20;
+let pdfParsedVehicles = [];
 
 // --- ELEMENTOS DOM (Se inicializarán en initApp) ---
 let loginScreen, catalogScreen, loginForm, loginRutInput, loginRutError;
@@ -334,7 +335,7 @@ async function renderAccessLogs() {
     
   } catch (err) {
     console.error("Error al cargar registros de acceso:", err);
-    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color: var(--color-danger);">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Error: ${err.message}</td></tr>`;
   }
 }
 
@@ -1143,4 +1144,364 @@ function sendWhatsAppRequest(e) {
   const whatsappUrl = `https://wa.me/${WHATSAPP_PHONE}?text=${encodedMessage}`;
   window.open(whatsappUrl, '_blank');
   closeModal('eval-modal');
+}
+
+// --- FUNCIONES PARA LA IMPORTACIÓN DESDE PDF ---
+
+async function importFromPDF(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const clearInput = () => { e.target.value = ''; };
+
+  const reader = new FileReader();
+  reader.readAsArrayBuffer(file);
+  reader.onload = async (event) => {
+    try {
+      const arrayBuffer = event.target.result;
+      
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        text += pageText + '\n';
+      }
+      
+      pdfParsedVehicles = parseCarPDFText(text);
+      
+      if (pdfParsedVehicles.length === 0) {
+        alert('No se encontraron vehículos válidos en el PDF. Asegúrate de que contenga nombres de marcas conocidas y precios.');
+        clearInput();
+        return;
+      }
+      
+      openModal('pdf-preview-modal');
+      renderPDFPreviewTable();
+    } catch (err) {
+      console.error("Error al procesar PDF:", err);
+      alert("Error al procesar el archivo PDF: " + err.message);
+    } finally {
+      clearInput();
+    }
+  };
+}
+
+function parseCarPDFText(text) {
+  const brands = [
+    'Toyota', 'Hyundai', 'Suzuki', 'Mazda', 'Chevrolet', 'Ford', 'Nissan', 'Kia',
+    'Peugeot', 'Mitsubishi', 'Honda', 'Subaru', 'Volkswagen', 'Fiat', 'Citroen',
+    'Chery', 'MG', 'BMW', 'Mercedes-Benz', 'Mercedes', 'Audi', 'Lexus', 'Volvo', 
+    'Jeep', 'Dodge', 'RAM', 'SsangYong', 'Mahindra', 'Renault', 'Opel', 'Changan', 
+    'Great Wall', 'GWM', 'JAC', 'DFSK', 'Maxus', 'Foton', 'BAIC', 'JMC', 'Jetour', 'Geely'
+  ];
+
+  const matches = [];
+  const lowerText = text.toLowerCase();
+  
+  brands.forEach(brand => {
+    const brandLower = brand.toLowerCase();
+    let idx = lowerText.indexOf(brandLower);
+    while (idx !== -1) {
+      matches.push({ brand, index: idx });
+      idx = lowerText.indexOf(brandLower, idx + brandLower.length);
+    }
+  });
+
+  matches.sort((a, b) => a.index - b.index);
+
+  const parsedVehicles = [];
+
+  if (matches.length > 0) {
+    for (let i = 0; i < matches.length; i++) {
+      const currentMatch = matches[i];
+      const startIdx = currentMatch.index;
+      const endIdx = (i + 1 < matches.length) ? matches[i + 1].index : text.length;
+      
+      const blockText = text.substring(startIdx, endIdx);
+      const vehicle = parseVehicleBlock(blockText, currentMatch.brand);
+      if (vehicle) {
+        parsedVehicles.push(vehicle);
+      }
+    }
+  } else {
+    // Fallback: split by lines and parse if they seem to contain car info
+    const lines = text.split('\n');
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.length > 10) {
+        const yearMatch = trimmed.match(/\b(199\d|20[0-2]\d)\b/);
+        if (yearMatch) {
+          let detectedBrand = 'Otros';
+          for (let b of brands) {
+            if (trimmed.toLowerCase().includes(b.toLowerCase())) {
+              detectedBrand = b;
+              break;
+            }
+          }
+          const vehicle = parseVehicleBlock(trimmed, detectedBrand);
+          if (vehicle) {
+            parsedVehicles.push(vehicle);
+          }
+        }
+      }
+    });
+  }
+
+  return parsedVehicles;
+}
+
+function parseVehicleBlock(blockText, brand) {
+  // 1. Year
+  let year = new Date().getFullYear();
+  const yearMatches = [...blockText.matchAll(/\b(199\d|20[0-2]\d)\b/g)];
+  if (yearMatches.length > 0) {
+    year = parseInt(yearMatches[0][1]);
+  }
+
+  // 2. Kilometraje (Mileage)
+  let mileage = 0;
+  const mileageRegex = /(\b\d{1,3}(?:\.\d{3})*|\b\d+)\s*(?:km|kms|kilometro|kilómetro|kilometros|kilómetros)\b/i;
+  const mileageMatch = blockText.match(mileageRegex);
+  if (mileageMatch) {
+    mileage = parseInt(mileageMatch[1].replace(/\./g, ''));
+  }
+
+  // 3. Price
+  let price = 0;
+  const priceRegexes = [
+    /\$\s*(\d{1,3}(?:\.\d{3})+|\d{6,9})\b/, // With $
+    /\b(\d{1,3}(?:\.\d{3}){2})\b/, // E.g. 18.990.000
+    /\b(\d{7,9})\b/ // E.g. 18990000
+  ];
+
+  let priceFound = false;
+  for (let regex of priceRegexes) {
+    const match = blockText.match(regex);
+    if (match) {
+      const val = parseInt(match[1].replace(/\./g, ''));
+      if (val >= 500000 && val <= 200000000) {
+        price = val;
+        priceFound = true;
+        break;
+      }
+    }
+  }
+
+  // If mileage is still 0, look for other numbers that could be mileage
+  if (mileage === 0) {
+    let cleanTextForMileage = blockText;
+    if (priceFound) {
+      cleanTextForMileage = cleanTextForMileage.replace(price.toString(), '');
+      const dottedPrice = price.toLocaleString('es-CL');
+      cleanTextForMileage = cleanTextForMileage.replace(dottedPrice, '');
+    }
+    cleanTextForMileage = cleanTextForMileage.replace(year.toString(), '');
+    
+    const numberMatches = cleanTextForMileage.match(/\b\d{1,3}(?:\.\d{3})*\b/g);
+    if (numberMatches) {
+      for (let numStr of numberMatches) {
+        const val = parseInt(numStr.replace(/\./g, ''));
+        if (val > 0 && val < 500000) {
+          mileage = val;
+          break;
+        }
+      }
+    }
+  }
+
+  // 4. Transmission
+  let transmission = 'Manual';
+  if (/\b(automatica|automática|aut|auto|at)\b/i.test(blockText)) {
+    transmission = 'Automática';
+  } else if (/\b(manual|mecanica|mecánica|mec|mt)\b/i.test(blockText)) {
+    transmission = 'Manual';
+  }
+
+  // 5. Fuel
+  let fuel = 'Bencina';
+  if (/\b(diesel|diésel|petroleo|petróleo)\b/i.test(blockText)) {
+    fuel = 'Diésel';
+  } else if (/\b(hibrido|híbrido|hybrid)\b/i.test(blockText)) {
+    fuel = 'Híbrido';
+  } else if (/\b(electrico|eléctrico|electric|ev)\b/i.test(blockText)) {
+    fuel = 'Eléctrico';
+  }
+
+  // 6. Model
+  let brandPos = blockText.indexOf(brand);
+  if (brandPos === -1) {
+    brandPos = blockText.toLowerCase().indexOf(brand.toLowerCase());
+  }
+  
+  let modelStart = brandPos + brand.length;
+  let modelPart = blockText.substring(modelStart).trim();
+
+  modelPart = modelPart.split('\n')[0];
+
+  let limitIdx = modelPart.length;
+
+  const yearMatch = modelPart.match(/\b(199\d|20[0-2]\d)\b/);
+  if (yearMatch && yearMatch.index < limitIdx) {
+    limitIdx = yearMatch.index;
+  }
+
+  const priceMatch = modelPart.match(/\$/);
+  if (priceMatch && priceMatch.index < limitIdx) {
+    limitIdx = priceMatch.index;
+  }
+
+  const kmMatch = modelPart.match(/\b\d+\s*kms?\b/i);
+  if (kmMatch && kmMatch.index < limitIdx) {
+    limitIdx = kmMatch.index;
+  }
+
+  const specTerms = [/\bmanual\b/i, /\bautomática\b/i, /\bautomatica\b/i, /\bdiesel\b/i, /\bdiésel\b/i, /\bbencina\b/i];
+  for (let term of specTerms) {
+    const m = modelPart.match(term);
+    if (m && m.index < limitIdx) {
+      limitIdx = m.index;
+    }
+  }
+
+  let model = modelPart.substring(0, limitIdx).trim();
+  model = model.replace(/^[:\-\s,]+|[:\-\s,]+$/g, '');
+
+  if (!model) {
+    const words = modelPart.split(/\s+/).slice(0, 3).join(' ');
+    model = words || 'Modelo Desconocido';
+  }
+
+  if (model.length > 50) {
+    model = model.substring(0, 50).trim() + '...';
+  }
+
+  return {
+    brand,
+    model,
+    year: year || new Date().getFullYear(),
+    mileage: mileage || 0,
+    transmission,
+    fuel,
+    price: price || 0,
+    status: 'disponible'
+  };
+}
+
+function renderPDFPreviewTable() {
+  const tbody = document.querySelector('#pdf-preview-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  
+  if (pdfParsedVehicles.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">
+          No se detectaron vehículos válidos en el PDF.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+  
+  pdfParsedVehicles.forEach((v, index) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <input type="checkbox" class="pdf-row-checkbox" data-index="${index}" checked>
+      </td>
+      <td>
+        <strong>${v.brand}</strong> ${v.model}
+      </td>
+      <td>${v.year}</td>
+      <td>${formatCLP(v.price)}</td>
+      <td>${v.mileage.toLocaleString('es-CL')} KM</td>
+      <td>
+        <span style="font-size: 0.75rem; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; margin-right: 4px;">${v.transmission}</span>
+        <span style="font-size: 0.75rem; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">${v.fuel}</span>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+  
+  // Set master checkbox to checked
+  const master = document.getElementById('pdf-select-all');
+  if (master) master.checked = true;
+}
+
+function toggleSelectAllPDF(master) {
+  const checkboxes = document.querySelectorAll('.pdf-row-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = master.checked;
+  });
+}
+
+async function confirmPDFImport() {
+  const checkboxes = document.querySelectorAll('.pdf-row-checkbox');
+  const selectedVehicles = [];
+  
+  checkboxes.forEach(cb => {
+    if (cb.checked) {
+      const idx = parseInt(cb.getAttribute('data-index'));
+      selectedVehicles.push(pdfParsedVehicles[idx]);
+    }
+  });
+  
+  if (selectedVehicles.length === 0) {
+    alert('Por favor selecciona al menos un vehículo para importar.');
+    return;
+  }
+  
+  const confirmBtn = document.getElementById('pdf-confirm-btn');
+  const originalText = confirmBtn.textContent;
+  confirmBtn.textContent = 'Importando...';
+  confirmBtn.disabled = true;
+  
+  try {
+    for (let v of selectedVehicles) {
+      const id = 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+      const vehicleData = {
+        id,
+        brand: v.brand,
+        model: v.model,
+        year: v.year,
+        mileage: v.mileage,
+        fuel: v.fuel,
+        transmission: v.transmission,
+        price: v.price,
+        status: 'disponible',
+        image: 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%231e293b%22/></svg>'
+      };
+      
+      if (supabaseClient) {
+        const { error } = await supabaseClient
+          .from('vehicles')
+          .insert([vehicleData]);
+        if (error) throw error;
+      } else {
+        vehicles.push(vehicleData);
+      }
+    }
+    
+    if (!supabaseClient) {
+      saveLocalFallback();
+    }
+    
+    await loadStock();
+    renderCatalog();
+    populateUniqueTypes();
+    renderAdminTable();
+    
+    closeModal('pdf-preview-modal');
+    alert(`Se importaron con éxito ${selectedVehicles.length} vehículos.`);
+  } catch (err) {
+    console.error("Error al importar desde PDF:", err);
+    alert("Error al guardar en la base de datos: " + err.message);
+  } finally {
+    confirmBtn.textContent = originalText;
+    confirmBtn.disabled = false;
+  }
 }
