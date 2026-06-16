@@ -824,8 +824,21 @@ function setupEventListeners() {
       
       checkAuth();
     } else {
+      const clean = cleanRUT(rutVal);
+      let errorMsg = 'RUT inválido. Formato esperado: 12345678-K';
+      
+      if (clean.length >= 2) {
+        const body = clean.slice(0, -1);
+        const typedDv = clean.slice(-1);
+        const expectedDv = calculateDV(body);
+        
+        if (body.length >= 7 && body.length <= 8) {
+          errorMsg = `RUT incorrecto. Para el cuerpo "${body}", el dígito verificador debe ser "${expectedDv}". Tú ingresaste "${typedDv}".`;
+        }
+      }
+      
       loginRutError.style.display = 'block';
-      loginRutError.textContent = 'RUT inválido. Formato correcto: 12.345.678-K';
+      loginRutError.textContent = errorMsg;
     }
   });
   
