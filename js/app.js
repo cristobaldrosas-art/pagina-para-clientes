@@ -110,24 +110,14 @@ function validateRUT(rutComplete) {
 }
 
 function formatRUT(rut) {
-  const clean = cleanRUT(rut);
+  const clean = cleanRUT(rut).slice(0, 9); // Limitar a un máximo de 9 caracteres limpios (ej. 12345678K)
   if (clean.length === 0) return '';
   if (clean.length === 1) return clean;
   
   const body = clean.slice(0, -1);
   const dv = clean.slice(-1);
   
-  let formatted = '';
-  let count = 0;
-  for (let i = body.length - 1; i >= 0; i--) {
-    formatted = body.charAt(i) + formatted;
-    count++;
-    if (count % 3 === 0 && i !== 0) {
-      formatted = '.' + formatted;
-    }
-  }
-  
-  return formatted + '-' + dv;
+  return body + '-' + dv;
 }
 
 // --- GESTIÓN DE STOCK (SUPABASE / LOCAL FALLBACK) ---
@@ -162,7 +152,12 @@ function loadLocalFallback() {
   const stored = localStorage.getItem('vehicles_stock');
   if (stored) {
     try {
-      vehicles = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        vehicles = parsed;
+      } else {
+        vehicles = [...window.DEFAULT_VEHICLES];
+      }
     } catch (e) {
       vehicles = [...window.DEFAULT_VEHICLES];
     }
@@ -196,6 +191,61 @@ async function seedDefaultVehicles() {
     if (error) console.error("Error al sembrar vehículos por defecto en Supabase:", error);
   } catch (e) {
     console.error(e);
+  }
+}
+
+// --- REGISTRO DE ACCESO DE CLIENTES ---
+
+async function registerAccess(rut) {
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('client_access')
+        .insert([{ rut }]);
+      if (error) console.error("Error al registrar acceso en Supabase:", error);
+    } catch (e) {
+      console.error("Error de conexión al registrar acceso:", e);
+    }
+  }
+}
+
+async function renderAccessLogs() {
+  const tbody = document.querySelector('#admin-logs-table tbody');
+  if (!tbody) return;
+  
+  if (!supabase) {
+    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Supabase no configurado. Modo local activo.</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Cargando registros...</td></tr>';
+  
+  try {
+    const { data, error } = await supabase
+      .from('client_access')
+      .select('*')
+      .order('accessed_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    tbody.innerHTML = '';
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">No hay registros de acceso aún.</td></tr>';
+      return;
+    }
+    
+    data.forEach(log => {
+      const tr = document.createElement('tr');
+      const date = new Date(log.accessed_at).toLocaleString('es-CL');
+      tr.innerHTML = `
+        <td style="font-weight: 600;">${formatRUT(log.rut)}</td>
+        <td>${date}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error("Error al cargar registros de acceso:", err);
+    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color: var(--color-danger);">Error: ${err.message}</td></tr>`;
   }
 }
 
@@ -388,6 +438,7 @@ function openAdminDashboard() {
   currentEditingId = null;
   resetAdminForm();
   renderAdminTable();
+  renderAccessLogs();
   openModal('admin-modal');
 }
 
@@ -399,6 +450,10 @@ function switchAdminTab(tabName) {
   document.querySelectorAll('.admin-tab-content').forEach(content => {
     content.classList.toggle('active', content.id === `admin-tab-${tabName}`);
   });
+  
+  if (tabName === 'logs') {
+    renderAccessLogs();
+  }
 }
 
 function renderAdminTable() {
@@ -707,7 +762,12 @@ function setupEventListeners() {
     const rutVal = loginRutInput.value;
     if (validateRUT(rutVal)) {
       loginRutError.style.display = 'none';
-      localStorage.setItem('auth_rut', cleanRUT(rutVal));
+      const cleaned = cleanRUT(rutVal);
+      localStorage.setItem('auth_rut', cleaned);
+      
+      // Registrar acceso asíncronamente (sin bloquear al usuario)
+      registerAccess(cleaned);
+      
       checkAuth();
     } else {
       loginRutError.style.display = 'block';
