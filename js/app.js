@@ -10,6 +10,8 @@ let supabaseClient = null;
 let vehicles = window.DEFAULT_VEHICLES ? [...window.DEFAULT_VEHICLES] : [];
 let currentEditingId = null;
 let selectedVehicleForEvaluation = null;
+let logCurrentPage = 1;
+const LOG_PAGE_SIZE = 20;
 
 // --- ELEMENTOS DOM (Se inicializarán en initApp) ---
 let loginScreen, catalogScreen, loginForm, loginRutInput, loginRutError;
@@ -284,17 +286,29 @@ async function renderAccessLogs() {
   
   tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Cargando registros...</td></tr>';
   
+  const prevBtn = document.getElementById('logs-prev-btn');
+  const nextBtn = document.getElementById('logs-next-btn');
+  const indicator = document.getElementById('logs-page-indicator');
+  
+  if (prevBtn) prevBtn.disabled = true;
+  if (nextBtn) nextBtn.disabled = true;
+  
   try {
-    const { data, error } = await supabaseClient
+    const from = (logCurrentPage - 1) * LOG_PAGE_SIZE;
+    const to = from + LOG_PAGE_SIZE - 1;
+    
+    const { data, error, count } = await supabaseClient
       .from('client_access')
-      .select('*')
-      .order('accessed_at', { ascending: false });
+      .select('*', { count: 'exact' })
+      .order('accessed_at', { ascending: false })
+      .range(from, to);
       
     if (error) throw error;
     
     tbody.innerHTML = '';
     if (!data || data.length === 0) {
       tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">No hay registros de acceso aún.</td></tr>';
+      if (indicator) indicator.textContent = 'Página 0 de 0';
       return;
     }
     
@@ -307,6 +321,16 @@ async function renderAccessLogs() {
       `;
       tbody.appendChild(tr);
     });
+    
+    const totalPages = Math.ceil((count || 0) / LOG_PAGE_SIZE);
+    
+    if (indicator) {
+      indicator.textContent = `Página ${logCurrentPage} de ${totalPages} (Total: ${count})`;
+    }
+    
+    if (prevBtn) prevBtn.disabled = (logCurrentPage <= 1);
+    if (nextBtn) nextBtn.disabled = (logCurrentPage >= totalPages);
+    
   } catch (err) {
     console.error("Error al cargar registros de acceso:", err);
     tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color: var(--color-danger);">Error: ${err.message}</td></tr>`;
@@ -567,6 +591,7 @@ function switchAdminTab(tabName) {
   });
   
   if (tabName === 'logs') {
+    logCurrentPage = 1;
     renderAccessLogs();
   }
 }
@@ -975,6 +1000,24 @@ function setupEventListeners() {
   
   // Formulario de WhatsApp enviar
   evalForm.addEventListener('submit', sendWhatsAppRequest);
+  
+  // Paginación de registros de acceso
+  const logsPrevBtn = document.getElementById('logs-prev-btn');
+  const logsNextBtn = document.getElementById('logs-next-btn');
+  if (logsPrevBtn) {
+    logsPrevBtn.addEventListener('click', () => {
+      if (logCurrentPage > 1) {
+        logCurrentPage--;
+        renderAccessLogs();
+      }
+    });
+  }
+  if (logsNextBtn) {
+    logsNextBtn.addEventListener('click', () => {
+      logCurrentPage++;
+      renderAccessLogs();
+    });
+  }
 }
 
 function sendWhatsAppRequest(e) {
