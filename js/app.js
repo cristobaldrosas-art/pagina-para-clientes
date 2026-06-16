@@ -480,20 +480,22 @@ function setupCurrencyFormatter(inputElement) {
 
 // --- PANEL DE ADMINISTRACIÓN (CRUD CON SUPABASE) ---
 
-function openAdminPasswordModal() {
-  let authenticatedRut = null;
-  try {
-    authenticatedRut = localStorage.getItem('auth_rut');
-  } catch (e) {
-    authenticatedRut = window.auth_rut_fallback;
-  }
-  if (!authenticatedRut && window.auth_rut_fallback) {
-    authenticatedRut = window.auth_rut_fallback;
-  }
-  
-  if (cleanRUT(authenticatedRut) !== ADMIN_RUT) {
-    alert('Acceso no autorizado. Este panel es exclusivo para el RUT del administrador.');
-    return;
+function openAdminPasswordModal(fromLogin = false) {
+  if (fromLogin !== true) {
+    let authenticatedRut = null;
+    try {
+      authenticatedRut = localStorage.getItem('auth_rut');
+    } catch (e) {
+      authenticatedRut = window.auth_rut_fallback;
+    }
+    if (!authenticatedRut && window.auth_rut_fallback) {
+      authenticatedRut = window.auth_rut_fallback;
+    }
+    
+    if (cleanRUT(authenticatedRut) !== ADMIN_RUT) {
+      alert('Acceso no autorizado. Este panel es exclusivo para el RUT del administrador.');
+      return;
+    }
   }
   
   adminPasswordInput.value = '';
@@ -514,7 +516,13 @@ function verifyAdminPassword(e) {
     authenticatedRut = window.auth_rut_fallback;
   }
   
-  if (cleanRUT(authenticatedRut) !== ADMIN_RUT) {
+  let isLoggingIn = false;
+  const loginRutClean = cleanRUT(loginRutInput ? loginRutInput.value : '');
+  if (loginRutClean === ADMIN_RUT && (!authenticatedRut || cleanRUT(authenticatedRut) !== ADMIN_RUT)) {
+    isLoggingIn = true;
+  }
+  
+  if (!isLoggingIn && cleanRUT(authenticatedRut) !== ADMIN_RUT) {
     adminPasswordError.style.display = 'block';
     adminPasswordError.textContent = 'RUT no autorizado';
     return;
@@ -522,7 +530,19 @@ function verifyAdminPassword(e) {
   
   if (adminPasswordInput.value === ADMIN_PASSWORD) {
     closeModal('admin-password-modal');
-    openAdminDashboard();
+    
+    if (isLoggingIn) {
+      try {
+        localStorage.setItem('auth_rut', ADMIN_RUT);
+      } catch (err) {}
+      window.auth_rut_fallback = ADMIN_RUT;
+      
+      registerAccess(ADMIN_RUT);
+      checkAuth();
+      openAdminDashboard();
+    } else {
+      openAdminDashboard();
+    }
   } else {
     adminPasswordError.style.display = 'block';
     adminPasswordError.textContent = 'Contraseña incorrecta';
@@ -858,15 +878,20 @@ function setupEventListeners() {
     if (validateRUT(rutVal)) {
       loginRutError.style.display = 'none';
       const cleaned = cleanRUT(rutVal);
-      try {
-        localStorage.setItem('auth_rut', cleaned);
-      } catch (e) {}
-      window.auth_rut_fallback = cleaned;
-      
-      // Registrar acceso asíncronamente (sin bloquear al usuario)
-      registerAccess(cleaned);
-      
-      checkAuth();
+      if (cleaned === ADMIN_RUT) {
+        // Si es el RUT del administrador, pedir clave de inmediato
+        openAdminPasswordModal(true);
+      } else {
+        try {
+          localStorage.setItem('auth_rut', cleaned);
+        } catch (e) {}
+        window.auth_rut_fallback = cleaned;
+        
+        // Registrar acceso asíncronamente (sin bloquear al usuario)
+        registerAccess(cleaned);
+        
+        checkAuth();
+      }
     } else {
       const clean = cleanRUT(rutVal);
       let errorMsg = 'RUT inválido. Formato esperado: 12345678-K';
@@ -909,8 +934,8 @@ function setupEventListeners() {
   filterPrice.addEventListener('change', renderCatalog);
   
   // Disparar modales admin
-  adminBtn.addEventListener('click', openAdminPasswordModal);
-  adminTriggerFooter.addEventListener('click', openAdminPasswordModal);
+  adminBtn.addEventListener('click', () => openAdminPasswordModal(false));
+  adminTriggerFooter.addEventListener('click', () => openAdminPasswordModal(false));
   
   // Modal de contraseña admin
   adminPasswordForm.addEventListener('submit', verifyAdminPassword);
