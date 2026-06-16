@@ -6,7 +6,7 @@ const ADMIN_PASSWORD = "admin123";
 let supabase = null;
 
 // --- ESTADO DE LA APLICACIÓN ---
-let vehicles = [];
+let vehicles = window.DEFAULT_VEHICLES ? [...window.DEFAULT_VEHICLES] : [];
 let currentEditingId = null;
 let selectedVehicleForEvaluation = null;
 
@@ -47,19 +47,37 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
-  // Esperar a que se cargue el archivo .env si la promesa existe
-  if (window.loadEnvPromise) {
-    await window.loadEnvPromise;
-  }
-
-  // Inicializar cliente de Supabase
-  if (window.supabase && window.SUPABASE_URL && window.SUPABASE_KEY) {
-    supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
-  }
-
-  await loadStock();
+  // 1. Configurar listeners de forma inmediata para que la UI responda
   setupEventListeners();
+  
+  // 2. Comprobar si ya está logueado para mostrar la pantalla correcta rápido
   checkAuth();
+
+  // 3. Cargar el entorno y el stock en segundo plano de forma asíncrona
+  try {
+    if (window.loadEnvPromise) {
+      await window.loadEnvPromise;
+    }
+    
+    if (window.supabase && window.SUPABASE_URL && window.SUPABASE_KEY) {
+      supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+    }
+    
+    await loadStock();
+    
+    // Re-renderizar catálogo y filtros una vez cargado el stock fresco de Supabase
+    if (localStorage.getItem('auth_rut')) {
+      renderCatalog();
+      populateUniqueTypes();
+    }
+  } catch (err) {
+    console.error("Error en la carga asíncrona de datos:", err);
+    loadLocalFallback();
+    if (localStorage.getItem('auth_rut')) {
+      renderCatalog();
+      populateUniqueTypes();
+    }
+  }
 }
 
 // --- AUTENTICACIÓN / RUT CHILENO ---
