@@ -1,6 +1,7 @@
 // --- CONFIGURACIÓN GLOBAL ---
 const WHATSAPP_PHONE = "56976034758";
-const ADMIN_PASSWORD = "admin123";
+const ADMIN_PASSWORD = "123Cris321";
+const ADMIN_RUT = "212762539";
 
 // --- CLIENTE SUPABASE ---
 let supabaseClient = null;
@@ -111,8 +112,20 @@ function checkAuth() {
     showScreen('catalog-screen');
     renderCatalog();
     populateUniqueTypes();
+    
+    // Controlar visibilidad del panel de administración
+    const cleanAuth = cleanRUT(authenticatedRut);
+    if (cleanAuth === ADMIN_RUT) {
+      if (adminBtn) adminBtn.style.display = 'inline-flex';
+      if (adminTriggerFooter) adminTriggerFooter.style.display = 'inline-block';
+    } else {
+      if (adminBtn) adminBtn.style.display = 'none';
+      if (adminTriggerFooter) adminTriggerFooter.style.display = 'none';
+    }
   } else {
     showScreen('login-screen');
+    if (adminBtn) adminBtn.style.display = 'none';
+    if (adminTriggerFooter) adminTriggerFooter.style.display = 'none';
   }
 }
 
@@ -468,6 +481,21 @@ function setupCurrencyFormatter(inputElement) {
 // --- PANEL DE ADMINISTRACIÓN (CRUD CON SUPABASE) ---
 
 function openAdminPasswordModal() {
+  let authenticatedRut = null;
+  try {
+    authenticatedRut = localStorage.getItem('auth_rut');
+  } catch (e) {
+    authenticatedRut = window.auth_rut_fallback;
+  }
+  if (!authenticatedRut && window.auth_rut_fallback) {
+    authenticatedRut = window.auth_rut_fallback;
+  }
+  
+  if (cleanRUT(authenticatedRut) !== ADMIN_RUT) {
+    alert('Acceso no autorizado. Este panel es exclusivo para el RUT del administrador.');
+    return;
+  }
+  
   adminPasswordInput.value = '';
   adminPasswordError.style.display = 'none';
   openModal('admin-password-modal');
@@ -476,6 +504,22 @@ function openAdminPasswordModal() {
 
 function verifyAdminPassword(e) {
   e.preventDefault();
+  let authenticatedRut = null;
+  try {
+    authenticatedRut = localStorage.getItem('auth_rut');
+  } catch (e) {
+    authenticatedRut = window.auth_rut_fallback;
+  }
+  if (!authenticatedRut && window.auth_rut_fallback) {
+    authenticatedRut = window.auth_rut_fallback;
+  }
+  
+  if (cleanRUT(authenticatedRut) !== ADMIN_RUT) {
+    adminPasswordError.style.display = 'block';
+    adminPasswordError.textContent = 'RUT no autorizado';
+    return;
+  }
+  
   if (adminPasswordInput.value === ADMIN_PASSWORD) {
     closeModal('admin-password-modal');
     openAdminDashboard();
