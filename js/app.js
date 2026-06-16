@@ -1,4 +1,3 @@
-
 // --- CONFIGURACIÓN GLOBAL ---
 const WHATSAPP_PHONE = "56976034758";
 const ADMIN_PASSWORD = "admin123";
@@ -11,36 +10,12 @@ let vehicles = window.DEFAULT_VEHICLES ? [...window.DEFAULT_VEHICLES] : [];
 let currentEditingId = null;
 let selectedVehicleForEvaluation = null;
 
-// Elementos DOM
-const loginScreen = document.getElementById('login-screen');
-const catalogScreen = document.getElementById('catalog-screen');
-const loginForm = document.getElementById('login-form');
-const loginRutInput = document.getElementById('login-rut');
-const loginRutError = document.getElementById('login-rut-error');
-
-const vehiclesGrid = document.getElementById('vehicles-grid');
-const searchInput = document.getElementById('search-input');
-const filterType = document.getElementById('filter-type');
-const filterTransmission = document.getElementById('filter-transmission');
-const filterPrice = document.getElementById('filter-price');
-const stockCount = document.getElementById('stock-count');
-
-const logoutBtn = document.getElementById('logout-btn');
-const adminBtn = document.getElementById('admin-btn');
-const adminTriggerFooter = document.getElementById('admin-trigger-footer');
-
-// Modales
-const adminModal = document.getElementById('admin-modal');
-const adminPasswordModal = document.getElementById('admin-password-modal');
-const adminPasswordForm = document.getElementById('admin-password-form');
-const adminPasswordInput = document.getElementById('admin-password');
-const adminPasswordError = document.getElementById('admin-password-error');
-
-const evalModal = document.getElementById('eval-modal');
-const evalForm = document.getElementById('eval-form');
-const evalClientType = document.getElementById('eval-client-type');
-const evalEmployerGroup = document.getElementById('eval-employer-group');
-const evalEmployer = document.getElementById('eval-employer');
+// --- ELEMENTOS DOM (Se inicializarán en initApp) ---
+let loginScreen, catalogScreen, loginForm, loginRutInput, loginRutError;
+let vehiclesGrid, searchInput, filterType, filterTransmission, filterPrice, stockCount;
+let logoutBtn, adminBtn, adminTriggerFooter;
+let adminModal, adminPasswordModal, adminPasswordForm, adminPasswordInput, adminPasswordError;
+let evalModal, evalForm, evalClientType, evalEmployerGroup, evalEmployer;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
@@ -48,7 +23,37 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
-  // 1. Configurar listeners de forma inmediata para que la UI responda
+  // Inicializar elementos DOM después de cargar la página
+  loginScreen = document.getElementById('login-screen');
+  catalogScreen = document.getElementById('catalog-screen');
+  loginForm = document.getElementById('login-form');
+  loginRutInput = document.getElementById('login-rut');
+  loginRutError = document.getElementById('login-rut-error');
+
+  vehiclesGrid = document.getElementById('vehicles-grid');
+  searchInput = document.getElementById('search-input');
+  filterType = document.getElementById('filter-type');
+  filterTransmission = document.getElementById('filter-transmission');
+  filterPrice = document.getElementById('filter-price');
+  stockCount = document.getElementById('stock-count');
+
+  logoutBtn = document.getElementById('logout-btn');
+  adminBtn = document.getElementById('admin-btn');
+  adminTriggerFooter = document.getElementById('admin-trigger-footer');
+
+  adminModal = document.getElementById('admin-modal');
+  adminPasswordModal = document.getElementById('admin-password-modal');
+  adminPasswordForm = document.getElementById('admin-password-form');
+  adminPasswordInput = document.getElementById('admin-password');
+  adminPasswordError = document.getElementById('admin-password-error');
+
+  evalModal = document.getElementById('eval-modal');
+  evalForm = document.getElementById('eval-form');
+  evalClientType = document.getElementById('eval-client-type');
+  evalEmployerGroup = document.getElementById('eval-employer-group');
+  evalEmployer = document.getElementById('eval-employer');
+
+  // 1. Configurar listeners de forma inmediata para que la UI responda rápido
   setupEventListeners();
   
   // 2. Comprobar si ya está logueado para mostrar la pantalla correcta rápido
@@ -67,14 +72,22 @@ async function initApp() {
     await loadStock();
     
     // Re-renderizar catálogo y filtros una vez cargado el stock fresco de Supabase
-    if (localStorage.getItem('auth_rut')) {
+    let authenticatedRut = null;
+    try {
+      authenticatedRut = localStorage.getItem('auth_rut');
+    } catch (e) {}
+    if (authenticatedRut || window.auth_rut_fallback) {
       renderCatalog();
       populateUniqueTypes();
     }
   } catch (err) {
     console.error("Error en la carga asíncrona de datos:", err);
     loadLocalFallback();
-    if (localStorage.getItem('auth_rut')) {
+    let authenticatedRut = null;
+    try {
+      authenticatedRut = localStorage.getItem('auth_rut');
+    } catch (e) {}
+    if (authenticatedRut || window.auth_rut_fallback) {
       renderCatalog();
       populateUniqueTypes();
     }
@@ -84,7 +97,16 @@ async function initApp() {
 // --- AUTENTICACIÓN / RUT CHILENO ---
 
 function checkAuth() {
-  const authenticatedRut = localStorage.getItem('auth_rut');
+  let authenticatedRut = null;
+  try {
+    authenticatedRut = localStorage.getItem('auth_rut');
+  } catch (e) {
+    authenticatedRut = window.auth_rut_fallback;
+  }
+  if (!authenticatedRut && window.auth_rut_fallback) {
+    authenticatedRut = window.auth_rut_fallback;
+  }
+
   if (authenticatedRut) {
     showScreen('catalog-screen');
     renderCatalog();
@@ -168,7 +190,13 @@ async function loadStock() {
 }
 
 function loadLocalFallback() {
-  const stored = localStorage.getItem('vehicles_stock');
+  let stored = null;
+  try {
+    stored = localStorage.getItem('vehicles_stock');
+  } catch (e) {
+    console.warn("localStorage no accesible:", e);
+  }
+  
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
@@ -187,7 +215,11 @@ function loadLocalFallback() {
 }
 
 function saveLocalFallback() {
-  localStorage.setItem('vehicles_stock', JSON.stringify(vehicles));
+  try {
+    localStorage.setItem('vehicles_stock', JSON.stringify(vehicles));
+  } catch (e) {
+    console.warn("No se pudo escribir en localStorage:", e);
+  }
 }
 
 async function seedDefaultVehicles() {
@@ -782,7 +814,10 @@ function setupEventListeners() {
     if (validateRUT(rutVal)) {
       loginRutError.style.display = 'none';
       const cleaned = cleanRUT(rutVal);
-      localStorage.setItem('auth_rut', cleaned);
+      try {
+        localStorage.setItem('auth_rut', cleaned);
+      } catch (e) {}
+      window.auth_rut_fallback = cleaned;
       
       // Registrar acceso asíncronamente (sin bloquear al usuario)
       registerAccess(cleaned);
@@ -803,7 +838,10 @@ function setupEventListeners() {
   
   // Logout
   logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('auth_rut');
+    try {
+      localStorage.removeItem('auth_rut');
+    } catch (e) {}
+    window.auth_rut_fallback = null;
     showScreen('login-screen');
   });
   
