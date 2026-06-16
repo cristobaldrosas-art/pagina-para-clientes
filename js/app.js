@@ -10,6 +10,7 @@ let supabaseClient = null;
 let vehicles = window.DEFAULT_VEHICLES ? [...window.DEFAULT_VEHICLES] : [];
 let currentEditingId = null;
 let selectedVehicleForEvaluation = null;
+let selectedVehicleForDetails = null;
 let logCurrentPage = 1;
 const LOG_PAGE_SIZE = 20;
 
@@ -159,8 +160,8 @@ function validateRUT(rutComplete) {
   const body = clean.slice(0, -1);
   const dv = clean.slice(-1);
   
-  // Validaciones básicas de formato/longitud
-  if (body.length < 7 || body.length > 8) return false;
+  // Validaciones básicas de formato/longitud (soporta RUTs antiguos de 6 a 8 dígitos en el cuerpo)
+  if (body.length < 6 || body.length > 8) return false;
   
   return calculateDV(body) === dv;
 }
@@ -414,6 +415,11 @@ function renderCatalog() {
   filtered.forEach(v => {
     const card = document.createElement('div');
     card.className = 'vehicle-card';
+    card.style.cursor = 'pointer';
+    card.onclick = (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      openDetailsModal(v.id);
+    };
     card.innerHTML = `
       <div class="card-image-wrapper">
         <span class="status-badge ${v.status}">${v.status}</span>
@@ -439,7 +445,7 @@ function renderCatalog() {
             <span>${Number(v.mileage).toLocaleString('es-CL')} km</span>
           </div>
         </div>
-        <button class="btn-card" onclick="openEvaluationModal('${v.id}')">Solicitar Evaluación</button>
+        <button class="btn-card" onclick="openDetailsModal('${v.id}')">Ver Detalles</button>
       </div>
     `;
     vehiclesGrid.appendChild(card);
@@ -458,6 +464,80 @@ function showScreen(screenId) {
   target.classList.remove('hidden');
   target.offsetWidth;
   target.classList.add('active');
+}
+
+// --- MODAL DE DETALLES DE VEHÍCULO ---
+
+function openDetailsModal(id) {
+  const v = vehicles.find(item => item.id === id);
+  if (!v) return;
+  
+  selectedVehicleForDetails = v;
+  
+  const mainImg = document.getElementById('details-main-img');
+  const thumb0Img = document.getElementById('details-thumb-0');
+  
+  if (mainImg) mainImg.src = v.image || '';
+  if (thumb0Img) thumb0Img.src = v.image || '';
+  
+  const slots = document.querySelectorAll('.thumb-slot');
+  slots.forEach((s, idx) => {
+    s.classList.toggle('active', idx === 0);
+    s.style.borderColor = idx === 0 ? 'var(--accent)' : 'transparent';
+    s.style.opacity = idx === 0 ? '1' : '0.6';
+  });
+  
+  document.getElementById('details-info-brand-model').textContent = `${v.brand} ${v.model}`;
+  document.getElementById('details-info-price').textContent = formatCLP(v.price);
+  document.getElementById('details-info-year').textContent = v.year;
+  document.getElementById('details-info-mileage').textContent = `${Number(v.mileage).toLocaleString('es-CL')} km`;
+  document.getElementById('details-info-transmission').textContent = v.transmission;
+  document.getElementById('details-info-fuel').textContent = v.fuel;
+  
+  const evalBtn = document.getElementById('details-eval-btn');
+  if (evalBtn) {
+    evalBtn.onclick = () => {
+      closeModal('details-modal');
+      openEvaluationModal(v.id);
+    };
+  }
+  
+  const waBtn = document.getElementById('details-wa-btn');
+  if (waBtn) {
+    waBtn.onclick = () => {
+      let message = `Hola! Me interesa solicitar información adicional del vehículo *${v.brand} ${v.model} (${v.year})* anunciado en Egaña Automotriz. ¿Me podrían compartir más imágenes o detalles?`;
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${WHATSAPP_PHONE}?text=${encodedMessage}`;
+      window.open(whatsappUrl, '_blank');
+    };
+  }
+  
+  openModal('details-modal');
+}
+
+function changeDetailsImage(index) {
+  if (!selectedVehicleForDetails) return;
+  
+  const mainImg = document.getElementById('details-main-img');
+  if (!mainImg) return;
+  
+  const lateralSVG = `data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23121417%22/><text x=%2250%25%22 y=%2245%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23f5be18%22 font-family=%22Outfit%22 font-size=%2218%22 font-weight=%22bold%22>Vista Lateral</text><text x=%2250%25%22 y=%2260%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-family=%22Outfit%22 font-size=%2212%22>Solicita fotos reales por WhatsApp</text></svg>`;
+  const interiorSVG = `data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%23121417%22/><text x=%2250%25%22 y=%2245%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23f5be18%22 font-family=%22Outfit%22 font-size=%2218%22 font-weight=%22bold%22>Vista Interior</text><text x=%2250%25%22 y=%2260%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%2394a3b8%22 font-family=%22Outfit%22 font-size=%2212%22>Solicita fotos reales por WhatsApp</text></svg>`;
+  
+  if (index === 0) {
+    mainImg.src = selectedVehicleForDetails.image || '';
+  } else if (index === 1) {
+    mainImg.src = lateralSVG;
+  } else if (index === 2) {
+    mainImg.src = interiorSVG;
+  }
+  
+  const slots = document.querySelectorAll('.thumb-slot');
+  slots.forEach((s, idx) => {
+    s.classList.toggle('active', idx === index);
+    s.style.borderColor = idx === index ? 'var(--accent)' : 'transparent';
+    s.style.opacity = idx === index ? '1' : '0.6';
+  });
 }
 
 // --- MODAL DE SOLICITUD DE EVALUACIÓN ---
@@ -926,7 +1006,7 @@ function setupEventListeners() {
         const typedDv = clean.slice(-1);
         const expectedDv = calculateDV(body);
         
-        if (body.length >= 7 && body.length <= 8) {
+        if (body.length >= 6 && body.length <= 8) {
           errorMsg = `RUT incorrecto. Para el cuerpo "${body}", el dígito verificador debe ser "${expectedDv}". Tú ingresaste "${typedDv}".`;
         }
       }
