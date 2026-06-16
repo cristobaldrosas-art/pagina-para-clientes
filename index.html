@@ -5,6 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Egaña Automotriz - Catálogo Privado</title>
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      const errorDiv = document.createElement('div');
+      errorDiv.style.position = 'fixed';
+      errorDiv.style.top = '0';
+      errorDiv.style.left = '0';
+      errorDiv.style.right = '0';
+      errorDiv.style.backgroundColor = '#ef4444';
+      errorDiv.style.color = '#ffffff';
+      errorDiv.style.padding = '15px';
+      errorDiv.style.fontSize = '14px';
+      errorDiv.style.zIndex = '99999';
+      errorDiv.style.fontFamily = 'monospace';
+      errorDiv.style.whiteSpace = 'pre-wrap';
+      errorDiv.innerHTML = '<strong>Error Detectado en la Web:</strong><br>' + 
+                            message + '<br>Archivo: ' + source + ' (Línea ' + lineno + ')';
+      document.body.appendChild(errorDiv);
+      return false;
+    };
+  </script>
 </head>
 <body>
 
