@@ -736,6 +736,24 @@ main {
   background: rgba(239, 68, 68, 0.05);
 }
 
+/* Entradas editables en la tabla de vista previa del PDF */
+.pdf-table-input {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+.pdf-table-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.7);
+}
+
 /* Vista previa de subida */
 .image-upload-preview {
   margin-top: 10px;
