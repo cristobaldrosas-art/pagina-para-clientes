@@ -3,7 +3,7 @@ const WHATSAPP_PHONE = "56976034758";
 const ADMIN_PASSWORD = "admin123";
 
 // --- CLIENTE SUPABASE ---
-let supabase = null;
+let supabaseClient = null;
 
 // --- ESTADO DE LA APLICACIÓN ---
 let vehicles = window.DEFAULT_VEHICLES ? [...window.DEFAULT_VEHICLES] : [];
@@ -66,7 +66,7 @@ async function initApp() {
     }
     
     if (window.supabase && window.SUPABASE_URL && window.SUPABASE_KEY) {
-      supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+      supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
     }
     
     await loadStock();
@@ -164,9 +164,9 @@ function formatRUT(rut) {
 // --- GESTIÓN DE STOCK (SUPABASE / LOCAL FALLBACK) ---
 
 async function loadStock() {
-  if (supabase) {
+  if (supabaseClient) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from('vehicles')
         .select('*')
         .order('created_at', { ascending: false });
@@ -223,9 +223,9 @@ function saveLocalFallback() {
 }
 
 async function seedDefaultVehicles() {
-  if (!supabase) return;
+  if (!supabaseClient) return;
   try {
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('vehicles')
       .insert(window.DEFAULT_VEHICLES.map(v => ({
         id: v.id,
@@ -248,9 +248,9 @@ async function seedDefaultVehicles() {
 // --- REGISTRO DE ACCESO DE CLIENTES ---
 
 async function registerAccess(rut) {
-  if (supabase) {
+  if (supabaseClient) {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('client_access')
         .insert([{ rut }]);
       if (error) console.error("Error al registrar acceso en Supabase:", error);
@@ -264,7 +264,7 @@ async function renderAccessLogs() {
   const tbody = document.querySelector('#admin-logs-table tbody');
   if (!tbody) return;
   
-  if (!supabase) {
+  if (!supabaseClient) {
     tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Supabase no configurado. Modo local activo.</td></tr>';
     return;
   }
@@ -272,7 +272,7 @@ async function renderAccessLogs() {
   tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Cargando registros...</td></tr>';
   
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('client_access')
       .select('*')
       .order('accessed_at', { ascending: false });
@@ -628,8 +628,8 @@ async function saveVehicle(e) {
         image: imageData || (existing ? existing.image : '')
       };
 
-      if (supabase) {
-        const { error } = await supabase
+      if (supabaseClient) {
+        const { error } = await supabaseClient
           .from('vehicles')
           .update(vehicleData)
           .eq('id', currentEditingId);
@@ -657,8 +657,8 @@ async function saveVehicle(e) {
         image: imageData || 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%25%22 height=%22100%25%22><rect width=%22100%25%22 height=%22100%25%22 fill=%22%231e293b%22/></svg>'
       };
 
-      if (supabase) {
-        const { error } = await supabase
+      if (supabaseClient) {
+        const { error } = await supabaseClient
           .from('vehicles')
           .insert([vehicleData]);
         if (error) throw error;
@@ -714,9 +714,9 @@ function editVehicle(id) {
 
 async function deleteVehicle(id) {
   if (confirm('¿Estás seguro de que deseas eliminar este vehículo de tu stock?')) {
-    if (supabase) {
+    if (supabaseClient) {
       try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
           .from('vehicles')
           .delete()
           .eq('id', id);
@@ -759,9 +759,9 @@ async function importDatabase(e) {
       const parsed = JSON.parse(event.target.result);
       if (Array.isArray(parsed)) {
         if (confirm(`Se detectaron ${parsed.length} vehículos. ¿Deseas reemplazar tu stock en la base de datos con este archivo?`)) {
-          if (supabase) {
+          if (supabaseClient) {
             // Eliminar existentes
-            const { error: delError } = await supabase.from('vehicles').delete().neq('id', 'dummy_id_to_clear');
+            const { error: delError } = await supabaseClient.from('vehicles').delete().neq('id', 'dummy_id_to_clear');
             if (delError) throw delError;
             
             // Insertar nuevos
@@ -769,7 +769,7 @@ async function importDatabase(e) {
               id, brand, model, year, mileage, fuel, transmission, price, image, status
             }));
             
-            const { error: insError } = await supabase.from('vehicles').insert(cleanedData);
+            const { error: insError } = await supabaseClient.from('vehicles').insert(cleanedData);
             if (insError) throw insError;
           } else {
             vehicles = parsed;
