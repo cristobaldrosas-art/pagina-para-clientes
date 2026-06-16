@@ -1,3 +1,4 @@
+
 // --- CONFIGURACIÓN GLOBAL ---
 const WHATSAPP_PHONE = "56976034758";
 const ADMIN_PASSWORD = "admin123";
@@ -876,7 +877,7 @@ function sendWhatsAppRequest(e) {
     return;
   }
   
-  let message = `Hola! Me interesa solicitar la evaluación para la compra de un vehículo:\n\n`;
+  let message = `Hola! Me interesa solicitar la evaluación para la compra de un vehículo en *Egaña Automotriz*:\n\n`;
   message += `*Vehículo de Interés:*\n`;
   message += `🚗 *Modelo:* ${selectedVehicleForEvaluation.brand} ${selectedVehicleForEvaluation.model}\n`;
   message += `📅 *Año:* ${selectedVehicleForEvaluation.year}\n`;
