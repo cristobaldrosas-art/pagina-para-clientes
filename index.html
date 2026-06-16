@@ -120,6 +120,70 @@
     </footer>
   </div>
 
+  <!-- ==================== MODAL: DETALLES DE VEHÍCULO ==================== -->
+  <div id="details-modal" class="modal-overlay">
+    <div class="modal-container" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 id="details-title">Detalles del Vehículo</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <!-- Galería de imágenes -->
+        <div class="details-gallery" style="margin-bottom: 20px;">
+          <img id="details-main-img" src="" alt="Vehículo" style="width: 100%; height: auto; max-height: 350px; object-fit: cover; border-radius: var(--border-radius-md); border: 1px solid var(--border-color);">
+          <div class="details-thumbnails" style="display: flex; gap: 8px; margin-top: 10px;">
+            <div class="thumb-slot active" onclick="changeDetailsImage(0)" style="width: 70px; height: 50px; border-radius: var(--border-radius-sm); overflow: hidden; border: 2px solid var(--accent); cursor: pointer;">
+              <img id="details-thumb-0" src="" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <div class="thumb-slot" onclick="changeDetailsImage(1)" style="width: 70px; height: 50px; border-radius: var(--border-radius-sm); overflow: hidden; border: 2px solid transparent; cursor: pointer; background: var(--bg-secondary); display: flex; align-items: center; justify-content: center; opacity: 0.6;">
+              <span style="font-size: 0.65rem; color: var(--text-secondary); text-align: center; line-height: 1.2;">Vista Lateral</span>
+            </div>
+            <div class="thumb-slot" onclick="changeDetailsImage(2)" style="width: 70px; height: 50px; border-radius: var(--border-radius-sm); overflow: hidden; border: 2px solid transparent; cursor: pointer; background: var(--bg-secondary); display: flex; align-items: center; justify-content: center; opacity: 0.6;">
+              <span style="font-size: 0.65rem; color: var(--text-secondary); text-align: center; line-height: 1.2;">Interior</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Detalles técnicos -->
+        <div class="details-info-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
+          <div class="detail-info-item">
+            <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Marca y Modelo</span>
+            <strong id="details-info-brand-model" style="font-size: 1.1rem; color: var(--text-primary);"></strong>
+          </div>
+          <div class="detail-info-item">
+            <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Precio</span>
+            <strong id="details-info-price" style="font-size: 1.15rem; color: var(--accent);"></strong>
+          </div>
+          <div class="detail-info-item">
+            <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Año</span>
+            <span id="details-info-year" style="font-weight: 500;"></span>
+          </div>
+          <div class="detail-info-item">
+            <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Kilometraje</span>
+            <span id="details-info-mileage" style="font-weight: 500;"></span>
+          </div>
+          <div class="detail-info-item">
+            <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Transmisión</span>
+            <span id="details-info-transmission" style="font-weight: 500;"></span>
+          </div>
+          <div class="detail-info-item">
+            <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Combustible</span>
+            <span id="details-info-fuel" style="font-weight: 500;"></span>
+          </div>
+        </div>
+        
+        <!-- Acciones -->
+        <div class="details-actions" style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button id="details-eval-btn" class="btn-primary" style="flex: 1; min-width: 200px;">Solicitar Evaluación de Crédito</button>
+          <button id="details-wa-btn" class="btn-secondary" style="flex: 1; min-width: 200px; display: flex; align-items: center; justify-content: center; gap: 8px; border-color: #25d366; color: #25d366; background: rgba(37, 211, 102, 0.05);">
+            <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.504-5.729-1.465L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.451 5.436 0 9.852-4.414 9.855-9.852.002-2.634-1.02-5.11-2.873-6.963C16.483 1.937 14.005.918 11.37.918c-5.44 0-9.857 4.417-9.86 9.858-.002 1.833.488 3.57 1.417 5.174l-.992 3.626 3.712-.973zm13.014-4.818c-.353-.176-2.096-1.033-2.42-1.15-.323-.117-.559-.176-.794.177-.235.353-.912 1.15-1.117 1.382-.206.23-.412.258-.765.082-.353-.176-1.493-.55-2.844-1.755-1.052-.94-1.76-2.1-1.966-2.453-.206-.353-.022-.544.154-.72.158-.158.353-.412.53-.618.176-.206.235-.353.353-.589.118-.235.059-.441-.03-.618-.088-.176-.794-1.912-1.087-2.617-.287-.688-.578-.596-.794-.607-.206-.01-.441-.01-.676-.01-.235 0-.618.088-.94.441-.324.353-1.234 1.206-1.234 2.941 0 1.735 1.265 3.41 1.441 3.647.177.235 2.49 3.802 6.03 5.328.843.362 1.5.578 2.013.74.846.269 1.617.23 2.227.14.68-.101 2.096-.856 2.39-1.682.293-.824.293-1.53.206-1.682-.088-.153-.323-.242-.676-.418z"/></svg>
+            Consultar por WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== MODAL: SOLICITUD DE EVALUACIÓN ==================== -->
   <div id="eval-modal" class="modal-overlay">
     <div class="modal-container">
