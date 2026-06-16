@@ -2,31 +2,31 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  --bg-primary: #0b0f19;
-  --bg-secondary: #111827;
-  --bg-glass: rgba(17, 24, 39, 0.7);
-  --bg-glass-card: rgba(31, 41, 55, 0.4);
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --bg-primary: #08090a; /* Negro profundo */
+  --bg-secondary: #121417; /* Gris oscuro carbón */
+  --bg-glass: rgba(18, 20, 23, 0.75);
+  --bg-glass-card: rgba(31, 34, 39, 0.45);
+  --text-primary: #f3f4f6; /* Gris muy claro / Blanco */
+  --text-secondary: #9ca3af; /* Gris medio */
+  --text-muted: #6b7280; /* Gris apagado */
   
   /* Colores de acento */
-  --accent: #0ea5e9; /* Sky 500 */
-  --accent-hover: #0284c7; /* Sky 600 */
-  --accent-glow: rgba(14, 165, 233, 0.2);
-  --accent-gold: #f59e0b; /* Amber 500 */
-  --accent-gold-hover: #d97706; /* Amber 600 */
+  --accent: #f5be18; /* Amarillo corporativo Egaña */
+  --accent-hover: #dab212; /* Amarillo hover */
+  --accent-glow: rgba(245, 190, 24, 0.15);
+  --accent-gold: #eab308;
+  --accent-gold-hover: #ca8a04;
   
   /* Estados */
   --color-success: #10b981;
   --color-danger: #ef4444;
-  --color-warning: #f59e0b;
+  --color-warning: #f5be18;
   
   /* Bordes y Sombras */
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-focus: #0ea5e9;
-  --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --shadow-glow: 0 0 20px rgba(14, 165, 233, 0.15);
+  --border-color: rgba(255, 255, 255, 0.06);
+  --border-focus: #f5be18;
+  --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-glow: 0 0 20px rgba(245, 190, 24, 0.12);
   
   --font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   --border-radius-sm: 8px;
@@ -48,8 +48,8 @@ body {
   line-height: 1.5;
   overflow-x: hidden;
   background-image: 
-    radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.1) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(245, 158, 11, 0.05) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(245, 190, 24, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(107, 114, 128, 0.03) 0px, transparent 50%);
   background-attachment: fixed;
 }
 
