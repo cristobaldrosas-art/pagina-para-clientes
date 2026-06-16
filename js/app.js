@@ -1174,7 +1174,7 @@ async function importFromPDF(e) {
       pdfParsedVehicles = parseCarPDFText(text);
       
       if (pdfParsedVehicles.length === 0) {
-        alert('No se encontraron vehículos válidos en el PDF. Asegúrate de que contenga nombres de marcas conocidas y precios.');
+        alert('No se encontraron vehículos válidos en el PDF. Asegúrate de que contenga nombres de marcas o precios.');
         clearInput();
         return;
       }
@@ -1196,7 +1196,10 @@ function parseCarPDFText(text) {
     'Peugeot', 'Mitsubishi', 'Honda', 'Subaru', 'Volkswagen', 'Fiat', 'Citroen',
     'Chery', 'MG', 'BMW', 'Mercedes-Benz', 'Mercedes', 'Audi', 'Lexus', 'Volvo', 
     'Jeep', 'Dodge', 'RAM', 'SsangYong', 'Mahindra', 'Renault', 'Opel', 'Changan', 
-    'Great Wall', 'GWM', 'JAC', 'DFSK', 'Maxus', 'Foton', 'BAIC', 'JMC', 'Jetour', 'Geely'
+    'Great Wall', 'GWM', 'JAC', 'DFSK', 'Maxus', 'Foton', 'BAIC', 'JMC', 'Jetour', 'Geely',
+    'Alfa Romeo', 'Aston Martin', 'BYD', 'Chrysler', 'Cupra', 'DS', 'Ferrari', 'Haval',
+    'Hummer', 'Infiniti', 'Isuzu', 'Jaguar', 'Land Rover', 'Lincoln', 'MINI', 'Mini',
+    'Porsche', 'Skoda', 'Škoda', 'Smart', 'Tesla', 'Triumph'
   ];
 
   const matches = [];
@@ -1213,13 +1216,38 @@ function parseCarPDFText(text) {
 
   matches.sort((a, b) => a.index - b.index);
 
-  const parsedVehicles = [];
+  // Filtrar solapamientos de marcas (ej: "Mercedes" y "Mercedes-Benz" en el mismo lugar)
+  const filteredMatches = [];
+  for (let i = 0; i < matches.length; i++) {
+    const current = matches[i];
+    let isDuplicate = false;
+    for (let j = 0; j < filteredMatches.length; j++) {
+      const existing = filteredMatches[j];
+      if (Math.abs(current.index - existing.index) < 15) {
+        if (current.brand.length > existing.brand.length) {
+          filteredMatches[j] = current;
+        }
+        isDuplicate = true;
+        break;
+      }
+    }
+    if (!isDuplicate) {
+      filteredMatches.push(current);
+    }
+  }
+  
+  filteredMatches.sort((a, b) => a.index - b.index);
 
-  if (matches.length > 0) {
-    for (let i = 0; i < matches.length; i++) {
-      const currentMatch = matches[i];
+  const parsedVehicles = [];
+  const coveredRanges = [];
+
+  if (filteredMatches.length > 0) {
+    for (let i = 0; i < filteredMatches.length; i++) {
+      const currentMatch = filteredMatches[i];
       const startIdx = currentMatch.index;
-      const endIdx = (i + 1 < matches.length) ? matches[i + 1].index : text.length;
+      const endIdx = (i + 1 < filteredMatches.length) ? filteredMatches[i + 1].index : text.length;
+      
+      coveredRanges.push({ start: startIdx, end: endIdx });
       
       const blockText = text.substring(startIdx, endIdx);
       const vehicle = parseVehicleBlock(blockText, currentMatch.brand);
@@ -1227,43 +1255,65 @@ function parseCarPDFText(text) {
         parsedVehicles.push(vehicle);
       }
     }
-  } else {
-    // Fallback: split by lines and parse if they seem to contain car info
-    const lines = text.split('\n');
+  }
+
+  // Escanear rangos no cubiertos por marcas conocidas para capturar autos sin marcas de la lista
+  let lastUncoveredStart = 0;
+  const uncoveredTexts = [];
+  
+  coveredRanges.forEach(range => {
+    if (range.start > lastUncoveredStart) {
+      uncoveredTexts.push(text.substring(lastUncoveredStart, range.start));
+    }
+    lastUncoveredStart = range.end;
+  });
+  if (lastUncoveredStart < text.length) {
+    uncoveredTexts.push(text.substring(lastUncoveredStart));
+  }
+
+  uncoveredTexts.forEach(uncText => {
+    const lines = uncText.split('\n');
     lines.forEach(line => {
       const trimmed = line.trim();
-      if (trimmed.length > 10) {
-        const yearMatch = trimmed.match(/\b(199\d|20[0-2]\d)\b/);
-        if (yearMatch) {
-          let detectedBrand = 'Otros';
-          for (let b of brands) {
-            if (trimmed.toLowerCase().includes(b.toLowerCase())) {
-              detectedBrand = b;
-              break;
-            }
+      if (trimmed.length > 15) {
+        const hasYear = /\b(199\d|20[0-2]\d)\b/.test(trimmed);
+        const hasPrice = /\$\s*\d|\b\d{1,3}(?:\.\d{3}){2}\b|\b\d{7,8}\b/.test(trimmed);
+        
+        if (hasYear || hasPrice) {
+          const words = trimmed.split(/\s+/).filter(w => w.length > 1 && !/\d/.test(w));
+          let brand = 'Otros';
+          if (words.length > 0) {
+            brand = words[0].replace(/^[:\-\s,]+|[:\-\s,]+$/g, '');
+            brand = brand.charAt(0).toUpperCase() + brand.slice(1);
           }
-          const vehicle = parseVehicleBlock(trimmed, detectedBrand);
+          
+          const vehicle = parseVehicleBlock(trimmed, brand);
           if (vehicle) {
             parsedVehicles.push(vehicle);
           }
         }
       }
     });
-  }
+  });
 
   return parsedVehicles;
 }
 
 function parseVehicleBlock(blockText, brand) {
   // 1. Year
-  let year = new Date().getFullYear();
+  let year = '';
   const yearMatches = [...blockText.matchAll(/\b(199\d|20[0-2]\d)\b/g)];
   if (yearMatches.length > 0) {
     year = parseInt(yearMatches[0][1]);
+  } else {
+    const fallbackYearMatch = blockText.match(/\b(20[0-2]\d)\b/);
+    if (fallbackYearMatch) {
+      year = parseInt(fallbackYearMatch[1]);
+    }
   }
 
   // 2. Kilometraje (Mileage)
-  let mileage = 0;
+  let mileage = '';
   const mileageRegex = /(\b\d{1,3}(?:\.\d{3})*|\b\d+)\s*(?:km|kms|kilometro|kilómetro|kilometros|kilómetros)\b/i;
   const mileageMatch = blockText.match(mileageRegex);
   if (mileageMatch) {
@@ -1291,15 +1341,17 @@ function parseVehicleBlock(blockText, brand) {
     }
   }
 
-  // If mileage is still 0, look for other numbers that could be mileage
-  if (mileage === 0) {
+  // Si no hay kilometraje explícito con "km", buscar otros números candidatos
+  if (mileage === '') {
     let cleanTextForMileage = blockText;
     if (priceFound) {
       cleanTextForMileage = cleanTextForMileage.replace(price.toString(), '');
       const dottedPrice = price.toLocaleString('es-CL');
       cleanTextForMileage = cleanTextForMileage.replace(dottedPrice, '');
     }
-    cleanTextForMileage = cleanTextForMileage.replace(year.toString(), '');
+    if (year) {
+      cleanTextForMileage = cleanTextForMileage.replace(year.toString(), '');
+    }
     
     const numberMatches = cleanTextForMileage.match(/\b\d{1,3}(?:\.\d{3})*\b/g);
     if (numberMatches) {
@@ -1337,16 +1389,18 @@ function parseVehicleBlock(blockText, brand) {
     brandPos = blockText.toLowerCase().indexOf(brand.toLowerCase());
   }
   
-  let modelStart = brandPos + brand.length;
+  let modelStart = brandPos !== -1 ? brandPos + brand.length : 0;
   let modelPart = blockText.substring(modelStart).trim();
 
   modelPart = modelPart.split('\n')[0];
 
   let limitIdx = modelPart.length;
 
-  const yearMatch = modelPart.match(/\b(199\d|20[0-2]\d)\b/);
-  if (yearMatch && yearMatch.index < limitIdx) {
-    limitIdx = yearMatch.index;
+  if (year) {
+    const yearMatch = modelPart.match(new RegExp('\\b' + year + '\\b'));
+    if (yearMatch && yearMatch.index < limitIdx) {
+      limitIdx = yearMatch.index;
+    }
   }
 
   const priceMatch = modelPart.match(/\$/);
@@ -1382,11 +1436,11 @@ function parseVehicleBlock(blockText, brand) {
   return {
     brand,
     model,
-    year: year || new Date().getFullYear(),
-    mileage: mileage || 0,
+    year: year || '',
+    mileage: mileage !== '' ? mileage : '',
     transmission,
     fuel,
-    price: price || 0,
+    price: price || '',
     status: 'disponible'
   };
 }
@@ -1409,25 +1463,50 @@ function renderPDFPreviewTable() {
   
   pdfParsedVehicles.forEach((v, index) => {
     const tr = document.createElement('tr');
+    tr.className = 'pdf-preview-row';
     tr.innerHTML = `
       <td>
-        <input type="checkbox" class="pdf-row-checkbox" data-index="${index}" checked>
+        <input type="checkbox" class="pdf-row-checkbox" checked>
       </td>
       <td>
-        <strong>${v.brand}</strong> ${v.model}
+        <div style="display: flex; gap: 6px;">
+          <input type="text" class="pdf-table-input pdf-row-brand" value="${v.brand}" placeholder="Marca" style="width: 90px; font-weight: bold;">
+          <input type="text" class="pdf-table-input pdf-row-model" value="${v.model}" placeholder="Modelo" style="min-width: 120px;">
+        </div>
       </td>
-      <td>${v.year}</td>
-      <td>${formatCLP(v.price)}</td>
-      <td>${v.mileage.toLocaleString('es-CL')} KM</td>
       <td>
-        <span style="font-size: 0.75rem; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; margin-right: 4px;">${v.transmission}</span>
-        <span style="font-size: 0.75rem; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">${v.fuel}</span>
+        <input type="number" class="pdf-table-input pdf-row-year" value="${v.year}" min="1980" max="2028" style="width: 70px;" placeholder="Año">
+      </td>
+      <td>
+        <input type="text" class="pdf-table-input pdf-row-price" value="${v.price > 0 ? formatCLP(v.price) : ''}" placeholder="Precio" style="width: 110px;">
+      </td>
+      <td>
+        <input type="number" class="pdf-table-input pdf-row-mileage" value="${v.mileage !== '' ? v.mileage : ''}" placeholder="KM" style="width: 80px;">
+      </td>
+      <td>
+        <div style="display: flex; gap: 4px;">
+          <select class="pdf-table-input pdf-row-transmission" style="width: 100px;">
+            <option value="Manual" ${v.transmission === 'Manual' ? 'selected' : ''}>Manual</option>
+            <option value="Automática" ${v.transmission === 'Automática' ? 'selected' : ''}>Automática</option>
+          </select>
+          <select class="pdf-table-input pdf-row-fuel" style="width: 95px;">
+            <option value="Bencina" ${v.fuel === 'Bencina' ? 'selected' : ''}>Bencina</option>
+            <option value="Diésel" ${v.fuel === 'Diésel' ? 'selected' : ''}>Diésel</option>
+            <option value="Híbrido" ${v.fuel === 'Híbrido' ? 'selected' : ''}>Híbrido</option>
+            <option value="Eléctrico" ${v.fuel === 'Eléctrico' ? 'selected' : ''}>Eléctrico</option>
+          </select>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
   });
   
-  // Set master checkbox to checked
+  // Asociar formateador de CLP dinámico a las entradas de precios en la tabla
+  document.querySelectorAll('.pdf-row-price').forEach(input => {
+    setupCurrencyFormatter(input);
+  });
+  
+  // Establecer checkbox maestro a seleccionado
   const master = document.getElementById('pdf-select-all');
   if (master) master.checked = true;
 }
@@ -1440,18 +1519,43 @@ function toggleSelectAllPDF(master) {
 }
 
 async function confirmPDFImport() {
-  const checkboxes = document.querySelectorAll('.pdf-row-checkbox');
+  const rows = document.querySelectorAll('.pdf-preview-row');
   const selectedVehicles = [];
   
-  checkboxes.forEach(cb => {
-    if (cb.checked) {
-      const idx = parseInt(cb.getAttribute('data-index'));
-      selectedVehicles.push(pdfParsedVehicles[idx]);
+  rows.forEach(row => {
+    const checkbox = row.querySelector('.pdf-row-checkbox');
+    if (checkbox && checkbox.checked) {
+      const brand = row.querySelector('.pdf-row-brand').value.trim();
+      const model = row.querySelector('.pdf-row-model').value.trim();
+      const year = parseInt(row.querySelector('.pdf-row-year').value) || new Date().getFullYear();
+      
+      const priceRaw = row.querySelector('.pdf-row-price').value.replace(/[^0-9]/g, '');
+      const price = parseInt(priceRaw) || 0;
+      
+      const mileage = parseInt(row.querySelector('.pdf-row-mileage').value) || 0;
+      
+      const transmission = row.querySelector('.pdf-row-transmission').value;
+      const fuel = row.querySelector('.pdf-row-fuel').value;
+      
+      if (!brand || !model) {
+        // Ignorar filas sin nombre
+        return;
+      }
+      
+      selectedVehicles.push({
+        brand,
+        model,
+        year,
+        price,
+        mileage,
+        transmission,
+        fuel
+      });
     }
   });
   
   if (selectedVehicles.length === 0) {
-    alert('Por favor selecciona al menos un vehículo para importar.');
+    alert('Por favor selecciona al menos un vehículo válido para importar.');
     return;
   }
   
@@ -1460,8 +1564,25 @@ async function confirmPDFImport() {
   confirmBtn.textContent = 'Importando...';
   confirmBtn.disabled = true;
   
+  let importedCount = 0;
+  let skippedCount = 0;
+
   try {
     for (let v of selectedVehicles) {
+      // Validar si el auto ya existe en el stock actual (mismo brand, model, year, price, mileage)
+      const isDuplicate = vehicles.some(existing => 
+        existing.brand.toLowerCase().trim() === v.brand.toLowerCase().trim() &&
+        existing.model.toLowerCase().trim() === v.model.toLowerCase().trim() &&
+        parseInt(existing.year) === parseInt(v.year) &&
+        parseInt(existing.price) === parseInt(v.price) &&
+        parseInt(existing.mileage) === parseInt(v.mileage)
+      );
+      
+      if (isDuplicate) {
+        skippedCount++;
+        continue;
+      }
+
       const id = 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
       const vehicleData = {
         id,
@@ -1484,6 +1605,7 @@ async function confirmPDFImport() {
       } else {
         vehicles.push(vehicleData);
       }
+      importedCount++;
     }
     
     if (!supabaseClient) {
@@ -1496,7 +1618,12 @@ async function confirmPDFImport() {
     renderAdminTable();
     
     closeModal('pdf-preview-modal');
-    alert(`Se importaron con éxito ${selectedVehicles.length} vehículos.`);
+    
+    let msg = `Se importaron con éxito ${importedCount} vehículos.`;
+    if (skippedCount > 0) {
+      msg += ` Se omitieron ${skippedCount} vehículos duplicados que ya existen en el catálogo.`;
+    }
+    alert(msg);
   } catch (err) {
     console.error("Error al importar desde PDF:", err);
     alert("Error al guardar en la base de datos: " + err.message);
