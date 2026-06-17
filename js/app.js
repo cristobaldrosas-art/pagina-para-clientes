@@ -16,11 +16,11 @@ const LOG_PAGE_SIZE = 20;
 let pdfParsedVehicles = [];
 
 // --- ELEMENTOS DOM (Se inicializarán en initApp) ---
-let loginScreen, catalogScreen, loginForm, loginRutInput, loginRutError;
+let loginScreen, catalogScreen, loginForm, loginRutInput, loginRutError, loginPhoneInput, loginPhoneError;
 let vehiclesGrid, searchInput, filterType, filterTransmission, filterPrice, stockCount;
 let logoutBtn, adminBtn, adminTriggerFooter;
 let adminModal, adminPasswordModal, adminPasswordForm, adminPasswordInput, adminPasswordError;
-let evalModal, evalForm, evalClientType, evalEmployerGroup, evalEmployer;
+let evalModal, evalForm, evalClientType, evalEmployerGroup, evalEmployer, evalPhoneInput;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,6 +34,8 @@ async function initApp() {
   loginForm = document.getElementById('login-form');
   loginRutInput = document.getElementById('login-rut');
   loginRutError = document.getElementById('login-rut-error');
+  loginPhoneInput = document.getElementById('login-phone');
+  loginPhoneError = document.getElementById('login-phone-error');
 
   vehiclesGrid = document.getElementById('vehicles-grid');
   searchInput = document.getElementById('search-input');
@@ -57,6 +59,7 @@ async function initApp() {
   evalClientType = document.getElementById('eval-client-type');
   evalEmployerGroup = document.getElementById('eval-employer-group');
   evalEmployer = document.getElementById('eval-employer');
+  evalPhoneInput = document.getElementById('eval-phone');
 
   // 1. Configurar listeners de forma inmediata para que la UI responda rápido
   setupEventListeners();
@@ -103,13 +106,19 @@ async function initApp() {
 
 function checkAuth() {
   let authenticatedRut = null;
+  let authenticatedPhone = null;
   try {
     authenticatedRut = localStorage.getItem('auth_rut');
+    authenticatedPhone = localStorage.getItem('auth_phone');
   } catch (e) {
     authenticatedRut = window.auth_rut_fallback;
+    authenticatedPhone = window.auth_phone_fallback;
   }
   if (!authenticatedRut && window.auth_rut_fallback) {
     authenticatedRut = window.auth_rut_fallback;
+  }
+  if (!authenticatedPhone && window.auth_phone_fallback) {
+    authenticatedPhone = window.auth_phone_fallback;
   }
 
   if (authenticatedRut) {
@@ -131,6 +140,16 @@ function checkAuth() {
     if (adminBtn) adminBtn.style.display = 'none';
     if (adminTriggerFooter) adminTriggerFooter.style.display = 'none';
   }
+}
+
+function cleanPhone(phone) {
+  return typeof phone === 'string' ? phone.replace(/[^0-9+]/g, '') : '';
+}
+
+function validatePhone(phone) {
+  if (typeof phone !== 'string') return false;
+  const clean = phone.replace(/[^0-9]/g, '');
+  return clean.length >= 8 && clean.length <= 15;
 }
 
 function cleanRUT(rut) {
@@ -264,13 +283,20 @@ async function seedDefaultVehicles() {
 
 // --- REGISTRO DE ACCESO DE CLIENTES ---
 
-async function registerAccess(rut) {
+async function registerAccess(rut, phone) {
   if (supabaseClient) {
     try {
       const { error } = await supabaseClient
         .from('client_access')
-        .insert([{ rut }]);
-      if (error) console.error("Error al registrar acceso en Supabase:", error);
+        .insert([{ rut, phone }]);
+      if (error) {
+        console.error("Error al registrar acceso completo en Supabase:", error);
+        // Fallback: si la columna 'phone' no existe en client_access de Supabase, insertar solo el rut
+        const { error: fallbackError } = await supabaseClient
+          .from('client_access')
+          .insert([{ rut }]);
+        if (fallbackError) console.error("Error al registrar acceso mediante fallback en Supabase:", fallbackError);
+      }
     } catch (e) {
       console.error("Error de conexión al registrar acceso:", e);
     }
@@ -282,11 +308,11 @@ async function renderAccessLogs() {
   if (!tbody) return;
   
   if (!supabaseClient) {
-    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Supabase no configurado. Modo local activo.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-secondary);">Supabase no configurado. Modo local activo.</td></tr>';
     return;
   }
   
-  tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Cargando registros...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-secondary);">Cargando registros...</td></tr>';
   
   const prevBtn = document.getElementById('logs-prev-btn');
   const nextBtn = document.getElementById('logs-next-btn');
@@ -309,7 +335,7 @@ async function renderAccessLogs() {
     
     tbody.innerHTML = '';
     if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">No hay registros de acceso aún.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-secondary);">No hay registros de acceso aún.</td></tr>';
       if (indicator) indicator.textContent = 'Página 0 de 0';
       return;
     }
@@ -317,8 +343,10 @@ async function renderAccessLogs() {
     data.forEach(log => {
       const tr = document.createElement('tr');
       const date = new Date(log.accessed_at).toLocaleString('es-CL');
+      const phoneDisplay = log.phone ? log.phone : '<span style="color:var(--text-muted)">No especificado</span>';
       tr.innerHTML = `
         <td style="font-weight: 600;">${formatRUT(log.rut)}</td>
+        <td>${phoneDisplay}</td>
         <td>${date}</td>
       `;
       tbody.appendChild(tr);
@@ -335,7 +363,7 @@ async function renderAccessLogs() {
     
   } catch (err) {
     console.error("Error al cargar registros de acceso:", err);
-    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center; color: var(--text-secondary);">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color: var(--text-secondary);">Error: ${err.message}</td></tr>`;
   }
 }
 
@@ -553,8 +581,12 @@ function openEvaluationModal(vehicleId) {
   
   evalForm.reset();
   
-  const clientRut = localStorage.getItem('auth_rut');
+  const clientRut = localStorage.getItem('auth_rut') || window.auth_rut_fallback;
+  const clientPhone = localStorage.getItem('auth_phone') || window.auth_phone_fallback;
   document.getElementById('eval-rut').value = clientRut ? formatRUT(clientRut) : '';
+  if (evalPhoneInput) {
+    evalPhoneInput.value = clientPhone ? clientPhone : '';
+  }
   
   openModal('eval-modal');
   toggleEmployerField();
@@ -981,24 +1013,25 @@ function setupEventListeners() {
   loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const rutVal = loginRutInput.value;
-    if (validateRUT(rutVal)) {
-      loginRutError.style.display = 'none';
-      const cleaned = cleanRUT(rutVal);
-      if (cleaned === ADMIN_RUT) {
-        // Si es el RUT del administrador, pedir clave de inmediato
+    const phoneVal = loginPhoneInput ? loginPhoneInput.value : '';
+    
+    const isRutValid = validateRUT(rutVal);
+    const isPhoneValid = validatePhone(phoneVal);
+    
+    const cleanedRut = cleanRUT(rutVal);
+    
+    if (cleanedRut === ADMIN_RUT) {
+      if (isRutValid) {
+        loginRutError.style.display = 'none';
         openAdminPasswordModal(true);
       } else {
-        try {
-          localStorage.setItem('auth_rut', cleaned);
-        } catch (e) {}
-        window.auth_rut_fallback = cleaned;
-        
-        // Registrar acceso asíncronamente (sin bloquear al usuario)
-        registerAccess(cleaned);
-        
-        checkAuth();
+        loginRutError.style.display = 'block';
+        loginRutError.textContent = 'RUT administrador incorrecto.';
       }
-    } else {
+      return;
+    }
+    
+    if (!isRutValid) {
       const clean = cleanRUT(rutVal);
       let errorMsg = 'RUT inválido. Formato esperado: 12345678-K';
       
@@ -1014,7 +1047,34 @@ function setupEventListeners() {
       
       loginRutError.style.display = 'block';
       loginRutError.textContent = errorMsg;
+      return;
+    } else {
+      loginRutError.style.display = 'none';
     }
+    
+    if (!isPhoneValid) {
+      if (loginPhoneError) {
+        loginPhoneError.style.display = 'block';
+        loginPhoneError.textContent = 'Por favor ingrese un número de teléfono válido (mínimo 8 dígitos).';
+      }
+      return;
+    } else {
+      if (loginPhoneError) loginPhoneError.style.display = 'none';
+    }
+    
+    const cleanedPhone = cleanPhone(phoneVal);
+    
+    try {
+      localStorage.setItem('auth_rut', cleanedRut);
+      localStorage.setItem('auth_phone', cleanedPhone);
+    } catch (err) {}
+    window.auth_rut_fallback = cleanedRut;
+    window.auth_phone_fallback = cleanedPhone;
+    
+    // Registrar acceso asíncronamente (sin bloquear al usuario)
+    registerAccess(cleanedRut, cleanedPhone);
+    
+    checkAuth();
   });
   
   // Dar formato de RUT en el login mientras escribe
@@ -1028,8 +1088,10 @@ function setupEventListeners() {
   logoutBtn.addEventListener('click', () => {
     try {
       localStorage.removeItem('auth_rut');
+      localStorage.removeItem('auth_phone');
     } catch (e) {}
     window.auth_rut_fallback = null;
+    window.auth_phone_fallback = null;
     showScreen('login-screen');
   });
   
@@ -1106,6 +1168,7 @@ function sendWhatsAppRequest(e) {
   
   const name = document.getElementById('eval-name').value.trim();
   const rut = document.getElementById('eval-rut').value.trim();
+  const phone = evalPhoneInput ? evalPhoneInput.value.trim() : '';
   const clientType = evalClientType.options[evalClientType.selectedIndex].text;
   const salary = document.getElementById('eval-salary').value.trim();
   const employer = evalEmployer.value.trim();
@@ -1113,6 +1176,11 @@ function sendWhatsAppRequest(e) {
   
   if (!validateRUT(rut)) {
     alert('Por favor ingrese un RUT de cliente válido.');
+    return;
+  }
+  
+  if (evalPhoneInput && !validatePhone(phone)) {
+    alert('Por favor ingrese un número de teléfono válido (mínimo 8 dígitos).');
     return;
   }
   
@@ -1130,6 +1198,7 @@ function sendWhatsAppRequest(e) {
   message += `*Datos de la Evaluación:*\n`;
   message += `👤 *Nombre:* ${name}\n`;
   message += `💳 *RUT:* ${rut}\n`;
+  message += `📞 *Teléfono:* ${phone}\n`;
   message += `💼 *Tipo de Cliente:* ${clientType}\n`;
   message += `💵 *Sueldo Líquido:* ${salary}\n`;
   
