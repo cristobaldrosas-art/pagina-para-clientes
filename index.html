@@ -47,6 +47,14 @@
           </small>
         </div>
         
+        <div class="form-group">
+          <label for="login-phone">Número de Teléfono</label>
+          <div class="input-wrapper">
+            <input type="tel" id="login-phone" placeholder="Ej. 976034758 o +56 9 7603 4758" required>
+          </div>
+          <span id="login-phone-error" class="input-error"></span>
+        </div>
+        
         <button type="submit" class="btn-primary">Ver Catálogo Completo</button>
       </form>
     </div>
@@ -219,6 +227,15 @@
             </div>
             
             <div class="form-group">
+              <label for="eval-phone">Teléfono de Contacto</label>
+              <div class="input-wrapper">
+                <input type="tel" id="eval-phone" placeholder="Ej. 976034758 o +56 9 7603 4758" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
               <label for="eval-client-type">Tipo de Cliente</label>
               <div class="input-wrapper">
                 <select id="eval-client-type" required>
@@ -229,22 +246,23 @@
                 </select>
               </div>
             </div>
-          </div>
-
-          <div class="form-row">
+            
             <div class="form-group">
               <label for="eval-salary">Sueldo Líquido Mensual</label>
               <div class="input-wrapper">
                 <input type="text" id="eval-salary" placeholder="Ej. $1.200.000" required>
               </div>
             </div>
+          </div>
 
+          <div class="form-row">
             <div class="form-group" id="eval-employer-group">
               <label for="eval-employer">Empleador / Razón Social</label>
               <div class="input-wrapper">
                 <input type="text" id="eval-employer" placeholder="Ej. ABC Servicios S.A.">
               </div>
             </div>
+            <div class="form-group" style="visibility: hidden; height: 0; margin: 0; padding: 0;"></div>
           </div>
 
           <div class="form-group">
@@ -439,6 +457,7 @@
                   <thead>
                     <tr>
                       <th>RUT Cliente</th>
+                      <th>Teléfono</th>
                       <th>Fecha y Hora de Acceso</th>
                     </tr>
                   </thead>
